@@ -1,0 +1,229 @@
+https://cisrvrecn.netcracker.com/view/DP/job/DP.Pub.Helm_deployer/77051/console
+
+global:
+  name: zookeeper
+  enablePersistentVolumeCreation: false
+  waitForPodsReady: true
+  podReadinessTimeout: 300
+  secrets:
+    monitoring:
+      smDbUsername: "admin"
+      smDbPassword: "admin"
+    integrationTests:
+      token: "jwt_kubernetes_token"
+      zabbix:
+        username: ""
+        password: ""
+ 
+operator:
+  serviceAccount:
+  affinity: {
+    "podAntiAffinity": {
+      "requiredDuringSchedulingIgnoredDuringExecution": [
+        {
+          "labelSelector": {
+            "matchExpressions": [
+              {
+                "key": "component",
+                "operator": "In",
+                "values": [
+                    "zookeeper-service-operator"
+                ]
+              }
+            ]
+          },
+          "topologyKey": "kubernetes.io/hostname"
+        }
+      ]
+    }
+  }
+  
+ 
+## Values for ZooKeeper deployment
+zooKeeper:
+  affinity: {
+    "podAntiAffinity": {
+      "requiredDuringSchedulingIgnoredDuringExecution": [
+      {
+        "labelSelector": {
+          "matchExpressions": [
+          {
+            "key": "component",
+            "operator": "In",
+            "values": [
+              "zookeeper"
+            ]
+          }
+          ]
+        },
+        "topologyKey": "kubernetes.io/hostname"
+      }
+      ]
+    }
+  }
+  
+  disruptionBudget:
+    enabled: false
+  replicas: 3
+  storage:
+    className:
+      - csi-sc-cinderplugin
+    size: 10Gi
+  snapshotStorage:
+    persistentVolumeType:
+    persistentVolumeName:
+    persistentVolumeClaimName:
+    volumeSize:
+    storageClass:
+    nfsServer:
+    nfsPath:
+  heapSize: 256
+  jolokiaPort: 9087
+  resources:
+    requests:
+      cpu: 50m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 512Mi
+  quorumAuthEnabled: true
+  securityContext: {
+    "fsGroup": 1000
+  }
+   
+ 
+## Values for ZooKeeper Monitoring deployment
+monitoring:
+  install: true
+  affinity: {
+    "podAffinity": {
+      "preferredDuringSchedulingIgnoredDuringExecution": [
+      {
+        "podAffinityTerm": {
+          "labelSelector": {
+            "matchExpressions": [
+            {
+              "key": "component",
+              "operator": "In",
+              "values": [
+                "zookeeper"
+              ]
+            }
+            ]
+          },
+          "topologyKey": "kubernetes.io/hostname"
+        },
+        "weight": 100
+      }
+      ]
+    }
+  }
+  
+  resources:
+    requests:
+      cpu: 25m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  monitoringType: grafana
+  installGrafanaDashboard: true
+  zooKeeperHost: "'zookeeper-1:2181','zookeeper-2:2181','zookeeper-3:2181'"
+  zooKeeperVolumes: "pv-zk-zookeeper-service-zookeeper-1,pv-zk-zookeeper-service-zookeeper-2,pv-zk-zookeeper-service-zookeeper-3"
+  needToCleanInfluxDb: false
+  zooKeeperBackupDaemonHost: zookeeper-backup-daemon
+  zooKeeperJolokiaPort: 9087
+  smDbHost: "https://api.altice.managed.netcracker.cloud:6443"
+  smDbName: cloud_example_openshift_sdntest_example_com
+  securityContext: {
+    "runAsUser": 1000
+  }
+ 
+## Values for ZooKeeper Backup Daemon deployment
+backupDaemon:
+  install: false
+  affinity: {
+    "podAffinity": {
+      "preferredDuringSchedulingIgnoredDuringExecution": [
+      {
+        "podAffinityTerm": {
+          "labelSelector": {
+            "matchExpressions": [
+            {
+              "key": "component",
+              "operator": "In",
+              "values": [
+                "zookeeper"
+              ]
+            }
+            ]
+          },
+          "topologyKey": "kubernetes.io/hostname"
+        },
+        "weight": 100
+      }
+      ]
+    }
+  }
+  tolerations:
+  - key: "key3"
+    operator: "Equal"
+    value: "value3"
+    effect: "NoExecute"
+    tolerationSeconds: 3600
+  priorityClassName: "low-priority"
+  backupStorage:
+    persistentVolumeType: standalone
+    persistentVolumeName: pv-zk-snapshots
+    persistentVolumeClaimName: pvc-zookeeper-snapshots
+    storageClass: standard
+    persistentVolumeLabel: "key=value"
+    nodeName: "node-1"
+    volumeSize: 1Gi
+    nfsServer: 10.105.32.47
+    nfsPath: /var/nfs_share/zookeeper
+  resources:
+    requests:
+      cpu: 25m
+      memory: 512Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+  backupSchedule: "22 22 * * *"
+  evictionPolicy: "0/1d,7d/delete"
+  ipv6: false
+  zooKeeperHost: zookeeper
+  zooKeeperPort: 2181
+ 
+# Values for Vault Secret Management
+vaultSecretManagement:
+  enabled: false
+  url: http://vault-service.vault:8200
+  method: kubernetes
+  role: kubernetes-operator-role
+  path: secret
+  writePolicies: true
+  passwordGenerationMechanism: operator
+  refreshCredentials: false
+ 
+## ZooKeeper Integration Tests parameters
+integrationTests:
+  install: false
+  waitForResult: true
+  timeout: 300
+  service:
+    name: zookeeper-integration-tests-runner
+  tags: "zookeeper_crud"
+  url: "https://kube.com:6443"
+  zookeeperIsManagedByOperator: "true"
+  zookeeperHost: "zookeeper"
+  zookeeperPort: 2181
+  zabbixUrl: "https://monitoring.com"
+  pvType: "nfs"
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 200m
+    limits:
+      memory: 256Mi
+      cpu: 400m
